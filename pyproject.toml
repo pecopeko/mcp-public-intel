@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-public-intel"
+version = "0.1.0"
+description = "Zero-API-key Model Context Protocol (MCP) stdio server for live public intelligence: SEC EDGAR XBRL & Form D funding, Greenhouse/Lever/Ashby ATS jobs, Shopify catalogs, Substack public posts, and Podcast RSS/Podcasting 2.0 transcripts."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [
+    { name = "pecopeko" }
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "sec-edgar",
+    "xbrl",
+    "form-d",
+    "ats",
+    "greenhouse",
+    "lever",
+    "ashby",
+    "shopify",
+    "substack",
+    "podcast",
+    "rss",
+    "ai-agents",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "httpx>=0.27",
+]
+
+[project.urls]
+Homepage = "https://github.com/pecopeko/mcp-public-intel"
+Repository = "https://github.com/pecopeko/mcp-public-intel"
+Issues = "https://github.com/pecopeko/mcp-public-intel/issues"
+Sponsor = "https://github.com/sponsors/pecopeko"
+"Cloud Batch Actors (Apify)" = "https://apify.com/pecopeko"
+
+[project.scripts]
+mcp-public-intel = "mcp_public_intel.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

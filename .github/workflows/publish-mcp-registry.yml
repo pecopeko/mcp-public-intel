@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       publish_registry:
-        description: "Publish server.json to official registry.modelcontextprotocol.io via GitHub OIDC"
+        description: "Publish server manifests to official registry.modelcontextprotocol.io via GitHub OIDC"
         required: false
         type: boolean
         default: true
@@ -23,8 +23,7 @@ jobs:
     env:
       MCP_PUBLISHER_VERSION: v1.8.16
       IMAGE_NAME: ghcr.io/pecopeko/mcp-public-intel
-      IMAGE_TAG: "1.0.0"
-      MCP_SERVER_NAME: io.github.pecopeko/mcp-public-intel
+      SUITE_NAME: io.github.pecopeko/sec-edgar-shopify-greenhouse-ashby-podcast-substack-mcp
 
     steps:
       - name: Checkout repository
@@ -52,20 +51,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push multi-arch OCI image to GHCR
+      - name: Build and push suite-indexed OCI image to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            MCP_SERVER_NAME=${{ env.SUITE_NAME }}
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:1.0.0-suite
           labels: |
-            io.modelcontextprotocol.server.name=${{ env.MCP_SERVER_NAME }}
+            io.modelcontextprotocol.server.name=${{ env.SUITE_NAME }}
             org.opencontainers.image.source=https://github.com/pecopeko/mcp-public-intel
           annotations: |
-            index,manifest:io.modelcontextprotocol.server.name=${{ env.MCP_SERVER_NAME }}
+            index,manifest:io.modelcontextprotocol.server.name=${{ env.SUITE_NAME }}
             index,manifest:org.opencontainers.image.source=https://github.com/pecopeko/mcp-public-intel
 
       - name: Download official mcp-publisher CLI
@@ -77,10 +77,9 @@ jobs:
           curl --fail --location --silent --show-error "${url}" -o "${archive}"
           tar -xzf "${archive}" mcp-publisher
           chmod +x mcp-publisher
-          ./mcp-publisher --version || true
 
-      - name: Authenticate via GitHub OIDC & publish to Official MCP Registry
+      - name: Authenticate via GitHub OIDC & publish suite manifest to Official MCP Registry
         if: ${{ github.event_name == 'push' || inputs.publish_registry == true }}
         run: |
           ./mcp-publisher login github-oidc
-          ./mcp-publisher publish server.json
+          ./mcp-publisher publish server-suite.json

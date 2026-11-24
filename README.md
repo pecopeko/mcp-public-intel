@@ -4,6 +4,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![API Keys Required: 0](https://img.shields.io/badge/API%20Keys-0-brightgreen.svg)](#available-tools)
 [![MCP Protocol](https://img.shields.io/badge/MCP-JSON--RPC%202.0%20stdio-purple.svg)](#quick-start)
+[![pecopeko/mcp-public-intel MCP server](https://glama.ai/mcp/servers/pecopeko/mcp-public-intel/badges/score.svg)](https://glama.ai/mcp/servers/pecopeko/mcp-public-intel)
 
 **Zero-API-key Model Context Protocol (MCP) server for live public intelligence.**
 

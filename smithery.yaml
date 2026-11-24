@@ -1,0 +1,15 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      apifyToken:
+        type: string
+        description: Optional Apify API token for multi-domain cloud batch extraction (pecopeko PPE Actors)
+  commandFunction: |-
+    (config) => ({
+      command: 'mcp-public-intel',
+      args: [],
+      env: config && config.apifyToken ? { APIFY_TOKEN: config.apifyToken } : {}
+    })

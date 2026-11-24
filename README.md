@@ -1,6 +1,9 @@
+<!-- mcp-name: io.github.pecopeko/mcp-public-intel -->
+
 # mcp-public-intel
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.pecopeko%2Fmcp--public--intel-0A66C2.svg)](https://registry.modelcontextprotocol.io/?q=pecopeko)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![API Keys Required: 0](https://img.shields.io/badge/API%20Keys-0-brightgreen.svg)](#available-tools)
 [![MCP Protocol](https://img.shields.io/badge/MCP-JSON--RPC%202.0%20stdio-purple.svg)](#quick-start)
@@ -33,6 +36,19 @@ Paste into your MCP config (`claude_desktop_config.json`, `.cursor/mcp.json`, or
 }
 ```
 
+### Or Run via Official OCI Container (`ghcr.io`)
+
+```json
+{
+  "mcpServers": {
+    "public-intel": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/pecopeko/mcp-public-intel:1.0.0"]
+    }
+  }
+}
+```
+
 ### Or Install Locally with `pip`
 
 ```bash
@@ -44,7 +60,7 @@ Then configure your client with `"command": "mcp-public-intel"` (or `"command": 
 
 ---
 
-## Available Tools (6 Live Zero-Key Sources)
+## Available Tools (6 Live Zero-Key Sources + Optional Cloud Batch PPE Connector)
 
 | Tool | Required Inputs | Optional Inputs | Official Public Data Source |
 | :--- | :--- | :--- | :--- |
@@ -54,6 +70,7 @@ Then configure your client with `"command": "mcp-public-intel"` (or `"command": 
 | **`shopify_store_catalog`** | `store_url` | `limit`, `collection_handle` | Public Shopify `/products.json` & `/collections.json` (variants, min/max prices, discount %, stock status) |
 | **`substack_public_posts`** | `publication` | `limit`, `only_free` | Public Substack `/api/v1/archive` + `/feed` RSS to clean Markdown (honestly flags paywalled previews; zero bypass) |
 | **`podcast_rss_transcripts`** | `query_or_rss_url` | `limit` | Apple iTunes Lookup/Search API + Podcasting 2.0 RSS (`<itunes:owner>` host emails + VTT/SRT/JSON transcripts) |
+| **`apify_cloud_batch_extract`** | `extractor` | `actor_input`, `apify_token`, `timeout_secs` | Optional multi-domain cloud batch runner via [Apify Store PPE Actors (`pecopeko~*`)](https://apify.com/pecopeko) |
 
 ---
 

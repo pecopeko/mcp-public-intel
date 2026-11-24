@@ -2191,6 +2191,121 @@ def podcast_rss_transcripts(
 
 
 # ---------------------------------------------------------------------------
+# Cloud Pay-Per-Event (PPE) Batch Connector (Apify Store `pecopeko~*`)
+# ---------------------------------------------------------------------------
+
+APIFY_CLOUD_ACTORS: dict[str, dict[str, str]] = {
+    "shopify": {
+        "actor_id": "pecopeko~shopify-public-catalog-feed-extractor",
+        "store_url": "https://apify.com/pecopeko/shopify-public-catalog-feed-extractor",
+        "ppe_rate": "$0.001 / product",
+        "summary": "Multi-store Shopify /products.json & /collections.json cloud batch extractor",
+    },
+    "ats_jobs": {
+        "actor_id": "pecopeko~ats-greenhouse-lever-ashby-jobs-extractor",
+        "store_url": "https://apify.com/pecopeko/ats-greenhouse-lever-ashby-jobs-extractor",
+        "ppe_rate": "$0.001 / job",
+        "summary": "Multi-company Greenhouse, Lever & Ashby ATS job board cloud aggregator",
+    },
+    "substack": {
+        "actor_id": "pecopeko~substack-newsletter-posts-extractor",
+        "store_url": "https://apify.com/pecopeko/substack-newsletter-posts-extractor",
+        "ppe_rate": "$0.001 / post",
+        "summary": "Multi-publication Substack archive & Markdown cloud batch extractor",
+    },
+    "podcast": {
+        "actor_id": "pecopeko~podcast-rss-transcript-extractor",
+        "store_url": "https://apify.com/pecopeko/podcast-rss-transcript-extractor",
+        "ppe_rate": "$0.002 / episode & transcript",
+        "summary": "Batch Apple iTunes & Podcasting 2.0 VTT/SRT/JSON transcript extractor",
+    },
+    "sec_edgar": {
+        "actor_id": "pecopeko~sec-edgar-8-k-10-k-item-extractor",
+        "store_url": "https://apify.com/pecopeko/sec-edgar-8-k-10-k-item-extractor",
+        "ppe_rate": "$0.004 / filing",
+        "summary": "Batch SEC EDGAR 8-K, 10-K & 10-Q section & XBRL cloud extractor",
+    },
+    "website_tech_stack": {
+        "actor_id": "pecopeko~website-tech-stack-sitemap-extractor",
+        "store_url": "https://apify.com/pecopeko/website-tech-stack-sitemap-extractor",
+        "ppe_rate": "$0.002 / site",
+        "summary": "Batch website technology stack, framework & XML sitemap cloud extractor",
+    },
+}
+
+
+def apify_cloud_batch_extract(
+    *,
+    extractor: str,
+    actor_input: dict[str, Any] | None = None,
+    apify_token: str | None = None,
+    timeout_secs: int = 120,
+    client: httpx.Client | None = None,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Execute multi-target cloud batch extraction on Apify Store PPE Actors (`pecopeko~*`)."""
+    del sleep_fn
+    import os
+
+    key = (extractor or "").strip().lower()
+    if key not in APIFY_CLOUD_ACTORS:
+        valid = ", ".join(sorted(APIFY_CLOUD_ACTORS.keys()))
+        raise ValueError(f"Unsupported extractor '{extractor}'. Choose one of: {valid}")
+
+    spec = APIFY_CLOUD_ACTORS[key]
+    token = (apify_token or os.environ.get("APIFY_TOKEN") or "").strip()
+    bounded_timeout = max(30, min(300, int(timeout_secs)))
+
+    if not token:
+        return {
+            "status": "setup_required",
+            "extractor": key,
+            "actor_id": spec["actor_id"],
+            "store_url": spec["store_url"],
+            "ppe_rate": spec["ppe_rate"],
+            "message": (
+                "Set APIFY_TOKEN in your MCP environment (or pass apify_token) to run high-volume "
+                "cloud batch extraction, scheduled runs, and dataset exports via Apify Store."
+            ),
+            "available_cloud_actors": APIFY_CLOUD_ACTORS,
+        }
+
+    url = f"https://api.apify.com/v2/acts/{spec['actor_id']}/run-sync-get-dataset-items"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "mcp-public-intel/1.0.0 (+https://github.com/pecopeko/mcp-public-intel)",
+    }
+    params = {"timeout": str(bounded_timeout), "format": "json"}
+    payload_in = dict(actor_input or {})
+
+    own_client = client is None
+    active = client if client is not None else httpx.Client(timeout=float(bounded_timeout) + 15.0)
+    try:
+        resp = active.post(url, params=params, headers=headers, json=payload_in)
+        if resp.status_code >= 400:
+            raise RuntimeError(
+                f"Apify cloud run failed (HTTP {resp.status_code} on {spec['actor_id']}): {resp.text[:300]}"
+            )
+        items = resp.json()
+        if not isinstance(items, list):
+            items = [items]
+        return {
+            "status": "ok",
+            "extractor": key,
+            "actor_id": spec["actor_id"],
+            "store_url": spec["store_url"],
+            "ppe_rate": spec["ppe_rate"],
+            "returned_items": len(items),
+            "items": items,
+        }
+    finally:
+        if own_client:
+            active.close()
+
+
+# ---------------------------------------------------------------------------
 # MCP Tool Registry & Dispatcher
 # ---------------------------------------------------------------------------
 
@@ -2378,6 +2493,48 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "apify_cloud_batch_extract",
+        "description": (
+            "Run high-volume multi-domain cloud batch extraction via Apify Store Pay-Per-Event "
+            "Actors (pecopeko~*): multi-store Shopify catalogs, multi-company ATS jobs, Substack "
+            "archives, Podcast transcripts, SEC 8-K/10-K filings, and website tech stacks."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "extractor": {
+                    "type": "string",
+                    "enum": [
+                        "shopify",
+                        "ats_jobs",
+                        "substack",
+                        "podcast",
+                        "sec_edgar",
+                        "website_tech_stack",
+                    ],
+                    "description": "Target cloud batch extractor family on Apify Store.",
+                },
+                "actor_input": {
+                    "type": "object",
+                    "description": "JSON input object forwarded directly to the cloud Actor.",
+                },
+                "apify_token": {
+                    "type": "string",
+                    "description": "Optional Apify API token (falls back to APIFY_TOKEN env var).",
+                },
+                "timeout_secs": {
+                    "type": "integer",
+                    "description": "Synchronous cloud run timeout in seconds (30-300, default 120).",
+                    "minimum": 30,
+                    "maximum": 300,
+                    "default": 120,
+                },
+            },
+            "required": ["extractor"],
+            "additionalProperties": False,
+        },
+    },
 ]
 
 TOOL_HANDLERS: dict[str, Callable[..., dict[str, Any]]] = {
@@ -2387,6 +2544,7 @@ TOOL_HANDLERS: dict[str, Callable[..., dict[str, Any]]] = {
     "shopify_store_catalog": shopify_store_catalog,
     "substack_public_posts": substack_public_posts,
     "podcast_rss_transcripts": podcast_rss_transcripts,
+    "apify_cloud_batch_extract": apify_cloud_batch_extract,
 }
 
 

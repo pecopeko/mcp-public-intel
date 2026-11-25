@@ -23,7 +23,7 @@ jobs:
     env:
       MCP_PUBLISHER_VERSION: v1.8.16
       IMAGE_NAME: ghcr.io/pecopeko/mcp-public-intel
-      SUITE_NAME: io.github.pecopeko/sec-edgar-shopify-greenhouse-ashby-podcast-substack-mcp
+      JPX_NAME: io.github.pecopeko/jpx-tokyo-stock-tdnet-edinet-japan-mcp
 
     steps:
       - name: Checkout repository
@@ -51,21 +51,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push suite-indexed OCI image to GHCR
+      - name: Build and push JPX-indexed OCI image to GHCR
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            MCP_SERVER_NAME=${{ env.SUITE_NAME }}
+            MCP_SERVER_NAME=${{ env.JPX_NAME }}
           tags: |
-            ${{ env.IMAGE_NAME }}:1.0.0-suite
+            ${{ env.IMAGE_NAME }}:1.1.0-jpx
+            ${{ env.IMAGE_NAME }}:latest
           labels: |
-            io.modelcontextprotocol.server.name=${{ env.SUITE_NAME }}
+            io.modelcontextprotocol.server.name=${{ env.JPX_NAME }}
             org.opencontainers.image.source=https://github.com/pecopeko/mcp-public-intel
           annotations: |
-            index,manifest:io.modelcontextprotocol.server.name=${{ env.SUITE_NAME }}
+            index,manifest:io.modelcontextprotocol.server.name=${{ env.JPX_NAME }}
             index,manifest:org.opencontainers.image.source=https://github.com/pecopeko/mcp-public-intel
 
       - name: Download official mcp-publisher CLI
@@ -78,8 +79,8 @@ jobs:
           tar -xzf "${archive}" mcp-publisher
           chmod +x mcp-publisher
 
-      - name: Authenticate via GitHub OIDC & publish suite manifest to Official MCP Registry
+      - name: Authenticate via GitHub OIDC & publish JPX manifest to Official MCP Registry
         if: ${{ github.event_name == 'push' || inputs.publish_registry == true }}
         run: |
           ./mcp-publisher login github-oidc
-          ./mcp-publisher publish server-suite.json
+          ./mcp-publisher publish server-jpx.json

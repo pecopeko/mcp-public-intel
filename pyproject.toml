@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-public-intel"
-version = "1.0.0"
+version = "1.1.0"
 description = "Zero-API-key Model Context Protocol (MCP) stdio server for live public intelligence: SEC EDGAR XBRL & Form D funding, Greenhouse/Lever/Ashby ATS jobs, Shopify catalogs, Substack public posts, and Podcast RSS/Podcasting 2.0 transcripts."
 readme = "README.md"
 license = { text = "MIT" }

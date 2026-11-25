@@ -13,8 +13,7 @@ from datetime import date, datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable
 from urllib.parse import urljoin, urlparse
 
-if TYPE_CHECKING:
-    import httpx
+import httpx
 
 from mcp_public_intel.http_client import (
     DEFAULT_USER_AGENT,
@@ -2231,7 +2230,105 @@ APIFY_CLOUD_ACTORS: dict[str, dict[str, str]] = {
         "ppe_rate": "$0.002 / site",
         "summary": "Batch website technology stack, framework & XML sitemap cloud extractor",
     },
+    "jpx_tdnet": {
+        "actor_id": "pecopeko~tokyo-stock-exchange-jpx-tdnet-english-extractor",
+        "store_url": "https://apify.com/pecopeko/tokyo-stock-exchange-jpx-tdnet-english-extractor",
+        "ppe_rate": "$0.003 / record",
+        "summary": "Batch Tokyo Stock Exchange (JPX/TDnet) English filings, .T quotes, tick/limit bands & BOJ news",
+    },
 }
+
+
+def jpx_tokyo_stock_tdnet_disclosures(
+    *,
+    ticker: str = "",
+    limit: int = 10,
+    client: httpx.Client | None = None,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Fetch real-time Tokyo Stock Exchange (JPX / TDnet) disclosures in English + live .T quote & limit bands."""
+    del sleep_fn
+    import unicodedata
+    import urllib.parse
+
+    bounded = max(1, min(25, int(limit)))
+    tk_clean = unicodedata.normalize("NFKC", str(ticker or "")).strip().upper()
+    if tk_clean.endswith(".T"):
+        tk_clean = tk_clean[:-2]
+    if len(tk_clean) == 5 and tk_clean.endswith("0"):
+        tk_clean = tk_clean[:4]
+
+    td_url = (
+        f"https://webapi.yanoshin.jp/webapi/tdnet/list/{urllib.parse.quote(tk_clean)}.json?limit={bounded}"
+        if tk_clean
+        else f"https://webapi.yanoshin.jp/webapi/tdnet/list/recent.json?limit={bounded}"
+    )
+
+    own_client = client is None
+    active = client if client is not None else httpx.Client(timeout=15.0, follow_redirects=True)
+    try:
+        r_td = active.get(td_url, headers={"User-Agent": "mcp-public-intel/1.1.0"})
+        r_td.raise_for_status()
+        td_items = r_td.json().get("items") or []
+        disclosures = []
+        for item in td_items[:bounded]:
+            td = item.get("Tdnet") or {}
+            raw_code = str(td.get("company_code") or "")
+            code4 = raw_code[:4] if len(raw_code) >= 4 else raw_code
+            jp_title = str(td.get("title") or "")
+            pdf = str(td.get("document_url") or "")
+            if "https://www.release.tdnet.info" in pdf:
+                pdf = pdf[pdf.find("https://www.release.tdnet.info"):]
+            cat = "CORPORATE_DISCLOSURE"
+            for kw, c_name in (
+                ("決算短信", "EARNINGS_SUMMARY"),
+                ("業績予想", "GUIDANCE_REVISION"),
+                ("自己株式", "SHARE_BUYBACK"),
+                ("配当", "DIVIDEND_REVISION"),
+                ("公開買付", "TENDER_OFFER_TOB"),
+                ("株式分割", "STOCK_SPLIT"),
+                ("月次", "MONTHLY_KPI"),
+            ):
+                if kw in jp_title:
+                    cat = c_name
+                    break
+            disclosures.append(
+                {
+                    "id": td.get("id"),
+                    "published_at_jst": td.get("pubdate"),
+                    "ticker": code4,
+                    "company_name_jp": td.get("company_name"),
+                    "event_category": cat,
+                    "japanese_title": jp_title,
+                    "pdf_url": pdf or None,
+                }
+            )
+
+        quote_summary = None
+        if tk_clean:
+            q_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(tk_clean)}.T?range=5d&interval=1d"
+            rq = active.get(q_url, headers={"User-Agent": "Mozilla/5.0"})
+            if rq.status_code == 200:
+                res_list = (rq.json().get("chart") or {}).get("result") or []
+                if res_list:
+                    meta = res_list[0].get("meta") or {}
+                    quote_summary = {
+                        "symbol": f"{tk_clean}.T",
+                        "currency": meta.get("currency") or "JPY",
+                        "last_price_jpy": meta.get("regularMarketPrice"),
+                        "previous_close_jpy": meta.get("chartPreviousClose"),
+                    }
+
+        return {
+            "query_ticker": tk_clean or "MARKET_WIDE_RECENT",
+            "returned_disclosures": len(disclosures),
+            "quote": quote_summary,
+            "disclosures": disclosures,
+            "cloud_batch_actor": APIFY_CLOUD_ACTORS["jpx_tdnet"],
+        }
+    finally:
+        if own_client:
+            active.close()
 
 
 def apify_cloud_batch_extract(
@@ -2494,11 +2591,37 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         },
     },
     {
+        "name": "jpx_tokyo_stock_tdnet_disclosures",
+        "description": (
+            "Fetch real-time Tokyo Stock Exchange (JPX / TDnet) corporate disclosures classified into "
+            "English catalyst categories plus live .T JPY stock quote. Zero API key required."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ticker": {
+                    "type": "string",
+                    "description": "Optional 4-char JPX stock code (e.g. '7203', '9984', '130A'). Leave empty for market-wide real-time feed.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Maximum disclosures to return (1-25, default 10).",
+                    "minimum": 1,
+                    "maximum": 25,
+                    "default": 10,
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "apify_cloud_batch_extract",
         "description": (
             "Run high-volume multi-domain cloud batch extraction via Apify Store Pay-Per-Event "
             "Actors (pecopeko~*): multi-store Shopify catalogs, multi-company ATS jobs, Substack "
-            "archives, Podcast transcripts, SEC 8-K/10-K filings, and website tech stacks."
+            "archives, Podcast transcripts, SEC 8-K/10-K filings, Tokyo Stock Exchange (JPX/TDnet) "
+            "English filings & limit bands, and website tech stacks."
         ),
         "inputSchema": {
             "type": "object",
@@ -2512,6 +2635,7 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                         "podcast",
                         "sec_edgar",
                         "website_tech_stack",
+                        "jpx_tdnet",
                     ],
                     "description": "Target cloud batch extractor family on Apify Store.",
                 },
@@ -2544,6 +2668,7 @@ TOOL_HANDLERS: dict[str, Callable[..., dict[str, Any]]] = {
     "shopify_store_catalog": shopify_store_catalog,
     "substack_public_posts": substack_public_posts,
     "podcast_rss_transcripts": podcast_rss_transcripts,
+    "jpx_tokyo_stock_tdnet_disclosures": jpx_tokyo_stock_tdnet_disclosures,
     "apify_cloud_batch_extract": apify_cloud_batch_extract,
 }
 
